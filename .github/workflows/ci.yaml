@@ -1,0 +1,42 @@
+name: CI - Train and Save the model # 工作流程的名稱：CI - 訓練並儲存模型
+
+# 定義觸發此工作流程的事件
+on:
+  push:
+    branches: [ main ] # 當 main 分支有新的 push 時觸發
+  pull_request:
+    branches: [ main ] # 當針對 main 分支發起 Pull Request (PR) 時觸發
+
+jobs:
+  matrix-app:
+    name: Train and Save the model # 工作任務的名稱
+    runs-on: ubuntu-latest # 使用最新版的 Ubuntu 虛擬機來跑這個任務
+    strategy:
+      matrix:
+        python: ["3.11", "3.12"] # 矩陣配置：這會讓任務在 Python 3.11 和 3.12 兩個版本上各跑一次（確保跨版本相容性）
+
+    steps:
+      - name: Checkout # 步驟 1：拉取（下載）程式碼
+        uses: actions/checkout@v4 # 修正：原為 action/checkout (少了 s)。此步驟會將您的 GitHub 專案程式碼下載到虛擬機中
+      
+      - name: Set python # 步驟 2：設定指定的 Python 環境
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }} # 根據 strategy.matrix 設定對應的 Python 版本
+          
+      - name: Upgrade pip # 步驟 3：升級 pip 以及相關核心打包套件
+        run: python -m pip install --upgrade pip setuptools wheel
+
+      - name: Install project dependencies # 步驟 4：安裝專案所需的 Python 依賴套件（讀取 requirements.txt）
+        run: python -m pip install -r requirements.txt
+
+      - name: Train the model # 步驟 5：執行模型訓練
+        run: |
+           python train.py      # 執行您的訓練腳本，會產生 artifacts/model.pkl 和 artifacts/metrics.json
+           ls -la artifacts     # 在終端機列出 artifacts 資料夾底下的檔案，用來確認檔案有成功產生
+
+      - name: Upload artifacts # 步驟 6：將訓練好的模型與指標上傳為 GitHub Actions 的產出物（Artifacts）
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-artifact-${{ matrix.python }}-${{ github.run_id }} # 產出物的命名，加上 Python 版本和執行 ID 做區隔
+          path: artifacts/ # 修正：必須指定要上傳的檔案或資料夾路徑，這裡設定上傳整個 artifacts/ 資料夾
